@@ -1910,6 +1910,21 @@
       this.draw();
     },
 
+    pulseEscapeToolsForDeadlockedBoard() {
+      if (this.hasAvailableMove()) return false;
+      if (!this.hasEscapeTools()) {
+        this.resolveIdleBoard();
+        return true;
+      }
+      this.status = "playing";
+      this.selected = null;
+      this.pointerDown = null;
+      this.triggerOptionHint();
+      this.updateHud();
+      this.draw();
+      return true;
+    },
+
     playAgainButton() {
       return {
         x: this.canvas.width / 2 - 160,
@@ -2132,7 +2147,11 @@
 
     trySwap(a, b) {
       if (this.selectedPowerupType() === magnetType) return this.activateMagnet(a, b);
-      if (this.busy || this.status !== "playing" || this.moves <= 0 || !this.isAdjacent(a, b)) return false;
+      if (this.busy || this.status !== "playing" || !this.isAdjacent(a, b)) return false;
+      if (this.moves <= 0) {
+        this.resolveIdleBoard();
+        return false;
+      }
       this.swap(a, b);
       const matches = this.findMatches();
       this.swap(a, b);
@@ -2140,11 +2159,9 @@
         this.busy = true;
         this.selected = null;
         this.animateSwap(a, b, false, () => {
-          this.selected = b;
           this.busy = false;
-          if (!this.hasAvailableMove()) {
-            this.resolveIdleBoard();
-          }
+          if (this.pulseEscapeToolsForDeadlockedBoard()) return;
+          this.selected = b;
         });
         return true;
       }
