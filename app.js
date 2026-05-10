@@ -5,6 +5,7 @@
   const bookwormMenuCanvas = document.querySelector("#bookwormMenuCanvas");
   const candyScoreEl = document.querySelector("#candyScore");
   const candyMovesEl = document.querySelector("#candyMoves");
+  let faviconLink = document.querySelector("#favicon");
 
   const candyTypes = [
     { name: "Star Book", color: "#1f69cf", accent: "star" },
@@ -91,6 +92,24 @@
   const cellKey = (col, row) => `${col},${row}`;
   const bookwormHighScoreKey = "bookwormWatchHighScore";
   const deweyHighScoreKey = "deweyDisorderHighScore";
+  const menuTitle = "Games for Mom <3";
+  const arcadeFavicon = "arcade%20cabinet.png";
+  const bookwormStartStructures = [
+    { type: "kitchenIsland", col: 4, row: 21, width: 2, height: 3, hp: 6 },
+    { type: "diningTable", col: 14, row: 21, width: 2, height: 3, hp: 6 },
+  ];
+  const bookwormStartStructureCellCount = bookwormStartStructures.reduce(
+    (total, structure) => total + structure.width * structure.height,
+    0,
+  );
+  const bookwormStartStructureBottomRow = bookwormStartStructures.reduce(
+    (bottom, structure) => Math.max(bottom, structure.row + structure.height - 1),
+    0,
+  );
+  const generatedFavicons = {
+    bookworm: null,
+    dewey: null,
+  };
   const readStoredNumber = (key, fallback = 0) => {
     try {
       if (typeof localStorage === "undefined") return fallback;
@@ -537,6 +556,81 @@
     ctx.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
   }
 
+  function ensureFaviconLink() {
+    if (faviconLink) return faviconLink;
+    if (typeof document.createElement !== "function" || !document.head) return null;
+    faviconLink = document.createElement("link");
+    faviconLink.id = "favicon";
+    faviconLink.rel = "icon";
+    faviconLink.type = "image/png";
+    document.head.appendChild(faviconLink);
+    return faviconLink;
+  }
+
+  function setFavicon(href) {
+    const link = ensureFaviconLink();
+    if (!link || !href) return;
+    link.href = href;
+  }
+
+  function makeCanvasFavicon(drawIcon) {
+    if (typeof document.createElement !== "function") return "";
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext?.("2d");
+    if (!ctx || typeof canvas.toDataURL !== "function") return "";
+    ctx.imageSmoothingEnabled = false;
+    drawIcon(ctx);
+    return canvas.toDataURL("image/png");
+  }
+
+  function dogFavicon() {
+    if (!generatedFavicons.bookworm) {
+      generatedFavicons.bookworm = makeCanvasFavicon((ctx) => {
+        drawPixelAussie(ctx, 32, 52, 1.18);
+      });
+    }
+    return generatedFavicons.bookworm;
+  }
+
+  function cactusBookFavicon() {
+    if (!imageLoaded(deweyImages.pieces)) {
+      if (typeof deweyImages.pieces.addEventListener === "function") {
+        deweyImages.pieces.addEventListener(
+          "load",
+          () => {
+            generatedFavicons.dewey = null;
+            if (activeGame === "candy") setFavicon(cactusBookFavicon());
+          },
+          { once: true },
+        );
+      }
+      return "";
+    }
+    if (!generatedFavicons.dewey) {
+      generatedFavicons.dewey = makeCanvasFavicon((ctx) => {
+        drawAtlasSprite(ctx, deweyImages.pieces, deweyPieceSprites[1], 32, 32, 58, 58);
+      });
+    }
+    return generatedFavicons.dewey;
+  }
+
+  function setBrowserChrome(screen) {
+    if (screen === "centipede") {
+      document.title = "Bookworm Watch";
+      setFavicon(dogFavicon());
+      return;
+    }
+    if (screen === "candy") {
+      document.title = "Dewey Disorder";
+      setFavicon(cactusBookFavicon());
+      return;
+    }
+    document.title = menuTitle;
+    setFavicon(arcadeFavicon);
+  }
+
   function drawPixelBookStack(ctx, x, y, scale = 1, variant = 0) {
     const colors = ["#e14232", "#5cc14d", "#3154c8", "#f0cf3e", "#c443b2", "#ebe4d2"];
     const books = [
@@ -649,6 +743,75 @@
     pixelRect(ctx, -5 * unit, -1 * unit, 10 * unit, 2 * unit, "#050505");
     pixelRect(ctx, -4 * unit, 3 * unit, 8 * unit, 2 * unit, "#050505");
     pixelRect(ctx, -1 * unit, -2 * unit, 2 * unit, 2 * unit, "#f0cf3e");
+    ctx.restore();
+  }
+
+  function drawPixelFurnitureBlock(
+    ctx,
+    x,
+    y,
+    scale = 1,
+    kind = "kitchenIsland",
+    partCol = 0,
+    partRow = 0,
+    connections = {},
+  ) {
+    const unit = Math.max(1, scale);
+    const isIsland = kind === "kitchenIsland";
+    const edge = "#050505";
+    ctx.save();
+    ctx.translate(Math.round(x), Math.round(y));
+
+    if (isIsland) {
+      const base = "#9da3a9";
+      const counter = "#d9dde0";
+      const panel = "#b8bec4";
+      const side = "#838b92";
+      const dark = "#646b73";
+      pixelRect(ctx, -10 * unit, -10 * unit, 20 * unit, 20 * unit, base);
+      if (partRow < 2) {
+        pixelRect(ctx, -10 * unit, -10 * unit, 20 * unit, 20 * unit, panel);
+        if (partRow === 0) {
+          pixelRect(ctx, -10 * unit, -9 * unit, 20 * unit, 7 * unit, counter);
+          pixelRect(ctx, -8 * unit, -7 * unit, 16 * unit, 2 * unit, "#f1f1ed");
+        }
+      } else {
+        pixelRect(ctx, -10 * unit, -10 * unit, 20 * unit, 7 * unit, panel);
+        pixelRect(ctx, -8 * unit, -2 * unit, 16 * unit, 8 * unit, side);
+        pixelRect(ctx, (partCol === 0 ? -7 : 3) * unit, -1 * unit, 4 * unit, 5 * unit, "#aeb5bb");
+        pixelRect(ctx, -8 * unit, 6 * unit, 16 * unit, 2 * unit, dark);
+      }
+
+      if (!connections.top) pixelRect(ctx, -10 * unit, -10 * unit, 20 * unit, 2 * unit, edge);
+      if (!connections.bottom) pixelRect(ctx, -10 * unit, 8 * unit, 20 * unit, 2 * unit, edge);
+      if (!connections.left) pixelRect(ctx, -10 * unit, -10 * unit, 2 * unit, 20 * unit, edge);
+      if (!connections.right) pixelRect(ctx, 8 * unit, -10 * unit, 2 * unit, 20 * unit, edge);
+      ctx.restore();
+      return;
+    }
+
+    if (partRow < 2) {
+      const base = "#8f5a32";
+      const light = "#c08045";
+      const mid = "#a96a38";
+      const dark = "#5b341f";
+      pixelRect(ctx, -10 * unit, -10 * unit, 20 * unit, 20 * unit, base);
+      pixelRect(ctx, -10 * unit, -8 * unit, 20 * unit, 9 * unit, light);
+      pixelRect(ctx, -10 * unit, 1 * unit, 20 * unit, 7 * unit, mid);
+      if (partRow === 0) pixelRect(ctx, -8 * unit, -6 * unit, 16 * unit, 2 * unit, "#d99a5f");
+      if (partRow === 1) pixelRect(ctx, -10 * unit, 6 * unit, 20 * unit, 2 * unit, dark);
+
+      if (!connections.top) pixelRect(ctx, -10 * unit, -10 * unit, 20 * unit, 2 * unit, edge);
+      if (partRow === 1) pixelRect(ctx, -10 * unit, 8 * unit, 20 * unit, 2 * unit, edge);
+      if (!connections.left) pixelRect(ctx, -10 * unit, -10 * unit, 2 * unit, 20 * unit, edge);
+      if (!connections.right) pixelRect(ctx, 8 * unit, -10 * unit, 2 * unit, 20 * unit, edge);
+    } else {
+      const legX = partCol === 0 ? -8 : 4;
+      pixelRect(ctx, legX * unit, -10 * unit, 6 * unit, 18 * unit, edge);
+      pixelRect(ctx, (legX + 2) * unit, -8 * unit, 2 * unit, 14 * unit, "#a96a38");
+      pixelRect(ctx, (legX + 1) * unit, -8 * unit, 4 * unit, 4 * unit, "#c08045");
+      pixelRect(ctx, (legX - 1) * unit, 6 * unit, 8 * unit, 3 * unit, edge);
+    }
     ctx.restore();
   }
 
@@ -878,9 +1041,11 @@
     maxShots: 3,
     state: "intro",
     messageTimer: 0,
+    messageKind: "wave",
     obstacles: new Map(),
     segments: [],
     bullets: [],
+    particles: [],
     isFiring: false,
     spider: null,
     spiderTimer: 4,
@@ -897,8 +1062,10 @@
       this.spider = null;
       this.spiderTimer = 1.1 + Math.random() * 1.1;
       this.messageTimer = 0;
+      this.messageKind = "wave";
       this.state = "intro";
       this.bullets = [];
+      this.particles = [];
       this.player = { x: 190, y: 656, targetX: 190, targetY: 656 };
       this.makeObstacles();
       this.spawnBookworm();
@@ -928,6 +1095,7 @@
     startFirstWave() {
       if (this.state !== "intro") return false;
       this.state = "playing";
+      this.messageKind = "wave";
       this.messageTimer = 1.5;
       this.stepTimer = 0;
       this.draw();
@@ -941,7 +1109,65 @@
     },
 
     isReservedObstacleCell(col, row) {
-      return col < 0 || col >= this.cols || row < 4 || row >= this.rows - 2 || (row > this.rows - 8 && col > 5 && col < 14);
+      return (
+        col < 0 ||
+        col >= this.cols ||
+        col === 0 ||
+        col === this.cols - 1 ||
+        row < 4 ||
+        row >= this.rows - 2 ||
+        (row > this.rows - 8 && col > 5 && col < 14) ||
+        this.isStartStructureCell(col, row)
+      );
+    },
+
+    isStartStructureCell(col, row) {
+      return bookwormStartStructures.some(
+        (structure) =>
+          col >= structure.col &&
+          col < structure.col + structure.width &&
+          row >= structure.row &&
+          row < structure.row + structure.height,
+      );
+    },
+
+    addStartStructures() {
+      for (const structure of bookwormStartStructures) {
+        for (let rowOffset = 0; rowOffset < structure.height; rowOffset += 1) {
+          for (let colOffset = 0; colOffset < structure.width; colOffset += 1) {
+            const col = structure.col + colOffset;
+            const row = structure.row + rowOffset;
+            this.obstacles.set(cellKey(col, row), {
+              col,
+              row,
+              hp: structure.hp,
+              maxHp: structure.hp,
+              type: structure.type,
+              partCol: colOffset,
+              partRow: rowOffset,
+              startStructure: true,
+            });
+          }
+        }
+      }
+    },
+
+    furnitureConnections(obstacle) {
+      const hasMatchingNeighbor = (dx, dy) => {
+        const neighbor = this.obstacles.get(cellKey(obstacle.col + dx, obstacle.row + dy));
+        return neighbor?.startStructure && neighbor.type === obstacle.type;
+      };
+      return {
+        top: hasMatchingNeighbor(0, -1),
+        right: hasMatchingNeighbor(1, 0),
+        bottom: hasMatchingNeighbor(0, 1),
+        left: hasMatchingNeighbor(-1, 0),
+      };
+    },
+
+    obstacleScore(obstacle) {
+      if (obstacle.startStructure) return 10 + Math.max(0, this.wave - 1) * 50;
+      return 10;
     },
 
     tryAddObstacle(col, row, type, hp = 2) {
@@ -955,6 +1181,7 @@
       const leftKey = cellKey(col, row);
       const rightKey = cellKey(col + 1, row);
       if (
+        row > bookwormStartStructureBottomRow ||
         this.isReservedObstacleCell(col, row) ||
         this.isReservedObstacleCell(col + 1, row) ||
         this.obstacles.has(leftKey) ||
@@ -971,6 +1198,7 @@
       const topKey = cellKey(col, row);
       const bottomKey = cellKey(col, row + 1);
       if (
+        row + 1 > bookwormStartStructureBottomRow ||
         this.isReservedObstacleCell(col, row) ||
         this.isReservedObstacleCell(col, row + 1) ||
         this.obstacles.has(topKey) ||
@@ -1003,8 +1231,9 @@
     },
 
     makeObstacles(extra = 0) {
-      const target = 28 + Math.min(14, this.wave * 2) + extra;
+      const target = 28 + Math.min(14, this.wave * 2) + extra + bookwormStartStructureCellCount;
       this.obstacles.clear();
+      this.addStartStructures();
       let couches = 0;
       let couchGuard = 0;
       while (couches < 2 && couchGuard < 120) {
@@ -1075,6 +1304,7 @@
         this.reset();
         return;
       }
+      if (this.messageTimer > 0) return;
       if (this.fireTimer > 0) return;
       this.bullets = this.bullets.filter((bullet) => bullet.y > -20);
       if (this.bullets.length >= this.maxShots) return;
@@ -1082,7 +1312,87 @@
       this.fireTimer = this.fireCooldown;
     },
 
+    obstacleParticleColors(type) {
+      if (type?.startsWith("couch")) return ["#7a4df0", "#b98a5e", "#f0cf3e", "#020202"];
+      if (type === "box") return ["#b87532", "#f0cf3e", "#6b3a1a", "#ffffff"];
+      if (type === "plant") return ["#00f060", "#2e8f43", "#b87532", "#f0cf3e"];
+      if (type === "kitchenIsland") return ["#d9dde0", "#9da3a9", "#646b73", "#050505"];
+      if (type === "diningTable") return ["#c08045", "#8f5a32", "#5b341f", "#050505"];
+      if (type === "sideTable") return ["#b87532", "#6b3a1a", "#f0cf3e", "#020202"];
+      if (type === "clothes") return ["#ff2aa6", "#3d5cff", "#f0cf3e", "#ffffff"];
+      return ["#d64234", "#253fba", "#f0cf3e", "#ffffff", "#00f060"];
+    },
+
+    addSceneryBurst(obstacle, sourceX = null, sourceY = null) {
+      const centerX = obstacle.col * this.cell + this.cell / 2;
+      const centerY = obstacle.row * this.cell + this.cell / 2;
+      const colors = this.obstacleParticleColors(obstacle.type);
+      const hitAngle = sourceX === null ? -Math.PI / 2 : Math.atan2(centerY - sourceY, centerX - sourceX);
+      for (let i = 0; i < 14; i += 1) {
+        const angle = hitAngle + (Math.random() - 0.5) * Math.PI * 1.45;
+        const speed = 48 + Math.random() * 104;
+        this.particles.push({
+          kind: "scenery",
+          x: centerX + (Math.random() - 0.5) * 8,
+          y: centerY + (Math.random() - 0.5) * 8,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 34 - Math.random() * 36,
+          size: 2 + randInt(3),
+          color: colors[randInt(colors.length)],
+          life: 0,
+          duration: 0.34 + Math.random() * 0.22,
+          spin: Math.random() < 0.5 ? -1 : 1,
+        });
+      }
+      for (let i = 0; i < 4; i += 1) {
+        this.particles.push({
+          kind: "spark",
+          x: centerX,
+          y: centerY,
+          vx: (Math.random() - 0.5) * 140,
+          vy: -50 - Math.random() * 90,
+          size: 2,
+          color: "#f0cf3e",
+          life: 0,
+          duration: 0.24 + Math.random() * 0.16,
+        });
+      }
+    },
+
+    addEnemyBurst(x, y, isBoss = false) {
+      const colors = ["#00f060", "#ff2aa6", "#f0cf3e", "#ffffff", "#253fba"];
+      const count = isBoss ? 34 : 24;
+      for (let i = 0; i < count; i += 1) {
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.35;
+        const speed = (isBoss ? 92 : 70) + Math.random() * (isBoss ? 185 : 140);
+        this.particles.push({
+          kind: i % 4 === 0 ? "enemyFlash" : "enemy",
+          x: x + (Math.random() - 0.5) * 10,
+          y: y + (Math.random() - 0.5) * 10,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 28,
+          size: (isBoss ? 4 : 3) + randInt(isBoss ? 5 : 4),
+          color: colors[randInt(colors.length)],
+          life: 0,
+          duration: (isBoss ? 0.58 : 0.46) + Math.random() * 0.26,
+          spin: Math.random() < 0.5 ? -1 : 1,
+        });
+      }
+    },
+
+    updateParticles(dt) {
+      for (const particle of this.particles) {
+        particle.life += dt;
+        particle.x += particle.vx * dt;
+        particle.y += particle.vy * dt;
+        particle.vy += (particle.kind === "scenery" ? 260 : 210) * dt;
+        particle.vx *= 1 - Math.min(0.18, dt * 3.2);
+      }
+      this.particles = this.particles.filter((particle) => particle.life < particle.duration);
+    },
+
     update(dt) {
+      this.updateParticles(dt);
       if (this.state !== "playing") {
         this.draw();
         return;
@@ -1185,7 +1495,10 @@
       const row = Math.floor(this.spider.y / this.cell);
       for (const offsetRow of [0, -1, 1]) {
         const key = cellKey(col, row + offsetRow);
-        if (this.obstacles.has(key)) {
+        const obstacle = this.obstacles.get(key);
+        if (obstacle) {
+          if (obstacle.startStructure) continue;
+          this.addSceneryBurst(obstacle, this.spider.x, this.spider.y);
           this.obstacles.delete(key);
           this.score += 2;
         }
@@ -1207,6 +1520,7 @@
         this.stepEvery = Math.max(0.07, this.stepEvery - 0.008);
         this.addObstacles(8);
         this.spawnBookworm();
+        this.messageKind = "wave";
         this.messageTimer = 1.2;
         return;
       }
@@ -1258,7 +1572,8 @@
         return;
       }
       this.spawnBookworm();
-      this.messageTimer = 1.2;
+      this.messageKind = "ouch";
+      this.messageTimer = 1.15;
     },
 
     resolveBulletHits() {
@@ -1268,6 +1583,7 @@
       this.bullets.forEach((bullet, bulletIndex) => {
         if (this.spider && Math.hypot(bullet.x - this.spider.x, bullet.y - this.spider.y) < 18) {
           spentBullets.add(bulletIndex);
+          this.addEnemyBurst(this.spider.x, this.spider.y, true);
           this.score += 900;
           this.spider = null;
           this.spiderTimer = 3.5 + Math.random() * 3.5;
@@ -1280,13 +1596,16 @@
           if (Math.hypot(bullet.x - centerX, bullet.y - centerY) < 14) {
             spentBullets.add(bulletIndex);
             spentSegments.add(index);
+            this.addEnemyBurst(centerX, centerY, index === 0);
             this.score += index === 0 ? 125 : 60;
-            this.obstacles.set(cellKey(segment.col, segment.row), {
-              col: segment.col,
-              row: segment.row,
-              hp: 1,
-              type: segment.part === "box" ? "box" : "bookStack",
-            });
+            if (!this.isReservedObstacleCell(segment.col, segment.row)) {
+              this.obstacles.set(cellKey(segment.col, segment.row), {
+                col: segment.col,
+                row: segment.row,
+                hp: 1,
+                type: segment.part === "box" ? "box" : "bookStack",
+              });
+            }
             break;
           }
         }
@@ -1300,8 +1619,9 @@
             obstacle.hp -= 1;
             spentBullets.add(bulletIndex);
             if (obstacle.hp <= 0) {
+              this.addSceneryBurst(obstacle, bullet.x, bullet.y);
               this.obstacles.delete(cellKey(obstacle.col, obstacle.row));
-              this.score += 10;
+              this.score += this.obstacleScore(obstacle);
             }
             break;
           }
@@ -1334,7 +1654,12 @@
       const x = obstacle.col * cell + cell / 2;
       const y = obstacle.row * cell + cell / 2;
       ctx.save();
-      ctx.globalAlpha = obstacle.hp >= (obstacle.maxHp ?? 2) ? 1 : 0.62;
+      const maxHp = obstacle.maxHp ?? 2;
+      ctx.globalAlpha = obstacle.startStructure
+        ? 0.72 + 0.28 * clamp(obstacle.hp / maxHp, 0, 1)
+        : obstacle.hp >= maxHp
+          ? 1
+          : 0.62;
       if (obstacle.type === "box") {
         drawPixelBox(ctx, x, y, 1);
       } else if (obstacle.type === "plant") {
@@ -1347,6 +1672,17 @@
         drawPixelVerticalCouchHalf(ctx, x, y, 1, "top");
       } else if (obstacle.type === "couchBottom") {
         drawPixelVerticalCouchHalf(ctx, x, y, 1, "bottom");
+      } else if (obstacle.type === "kitchenIsland" || obstacle.type === "diningTable") {
+        drawPixelFurnitureBlock(
+          ctx,
+          x,
+          y,
+          1,
+          obstacle.type,
+          obstacle.partCol,
+          obstacle.partRow,
+          this.furnitureConnections(obstacle),
+        );
       } else if (obstacle.type === "sideTable") {
         drawPixelSideTable(ctx, x, y, 1);
       } else if (obstacle.type === "clothes") {
@@ -1432,26 +1768,68 @@
       ctx.restore();
     },
 
+    drawParticles() {
+      const { ctx } = this;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      for (const particle of this.particles) {
+        const t = clamp(particle.life / particle.duration, 0, 1);
+        const alpha = 1 - t;
+        const x = Math.round(particle.x);
+        const y = Math.round(particle.y);
+        const size = Math.max(1, Math.round(particle.size * (1 - t * 0.28)));
+        ctx.globalAlpha = alpha;
+
+        if (particle.kind === "spark") {
+          pixelRect(ctx, x - size, y, size * 2 + 1, 1, particle.color);
+          pixelRect(ctx, x, y - size, 1, size * 2 + 1, particle.color);
+          continue;
+        }
+
+        if (particle.kind === "enemyFlash") {
+          pixelRect(ctx, x - size, y - 1, size * 2, 2, "#f0cf3e");
+          pixelRect(ctx, x - 1, y - size, 2, size * 2, "#f0cf3e");
+          pixelRect(ctx, x - Math.floor(size / 2), y - Math.floor(size / 2), size, size, particle.color);
+          continue;
+        }
+
+        if (particle.kind === "enemy") {
+          pixelRect(ctx, x - size, y - size, size * 2, size * 2, "#020202");
+          pixelRect(ctx, x - size + 1, y - size + 1, Math.max(1, size * 2 - 2), Math.max(1, size * 2 - 2), particle.color);
+          pixelRect(ctx, x - size + 2, y, Math.max(1, size), 2, "#ffffff");
+          continue;
+        }
+
+        pixelRect(ctx, x - size, y - size, size * 2, size * 2, "#020202");
+        pixelRect(ctx, x - size + 1, y - size + 1, Math.max(1, size * 2 - 2), Math.max(1, size * 2 - 2), particle.color);
+      }
+      ctx.restore();
+    },
+
     drawOverlay(title, subtitle) {
       const { ctx, canvas } = this;
+      const centerY = canvas.height / 2;
       this.updateHighScore();
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.78)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.strokeStyle = "#ff2aa6";
       ctx.lineWidth = 2;
-      ctx.strokeRect(84, canvas.height / 2 - 78, 312, 138);
+      ctx.strokeRect(84, centerY - 88, 312, 158);
       ctx.textAlign = "center";
       ctx.fillStyle = "#ff2aa6";
       ctx.font = "700 24px ui-monospace, SFMono-Regular, Menlo, monospace";
-      ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 36);
+      ctx.fillText(title, canvas.width / 2, centerY - 46);
+      ctx.fillStyle = "#f8f8ef";
+      ctx.font = "700 11px ui-monospace, SFMono-Regular, Menlo, monospace";
+      ctx.fillText("(the books are really free now!)", canvas.width / 2, centerY - 24);
       ctx.fillStyle = "#00f060";
       ctx.font = "700 16px ui-monospace, SFMono-Regular, Menlo, monospace";
-      ctx.fillText(`SCORE ${String(this.score).padStart(6, "0")}`, canvas.width / 2, canvas.height / 2 - 6);
-      ctx.fillText(`HIGH ${String(this.highScore).padStart(6, "0")}`, canvas.width / 2, canvas.height / 2 + 18);
+      ctx.fillText(`SCORE ${String(this.score).padStart(6, "0")}`, canvas.width / 2, centerY + 4);
+      ctx.fillText(`HIGH ${String(this.highScore).padStart(6, "0")}`, canvas.width / 2, centerY + 28);
       ctx.fillStyle = "#f0cf3e";
       ctx.font = "700 15px ui-monospace, SFMono-Regular, Menlo, monospace";
-      ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 44);
+      ctx.fillText(subtitle, canvas.width / 2, centerY + 54);
       ctx.restore();
     },
 
@@ -1461,10 +1839,10 @@
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.82)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      pixelRect(ctx, 46, 196, 388, 326, "#020202");
+      pixelRect(ctx, 58, 196, 364, 326, "#020202");
       ctx.strokeStyle = "#ff2aa6";
       ctx.lineWidth = 2;
-      ctx.strokeRect(48, 198, 384, 322);
+      ctx.strokeRect(60, 198, 360, 322);
       ctx.textAlign = "center";
       ctx.fillStyle = "#00f060";
       ctx.font = "700 18px ui-monospace, SFMono-Regular, Menlo, monospace";
@@ -1474,9 +1852,9 @@
       const lines = [
         "Oh no! The books have come",
         "alive while your parents are",
-        "away!! Dutifully prevent them",
-        "from encroaching on the",
-        "bedroom!",
+        "away!! Dutifully prevent",
+        "them from encroaching on",
+        "the bedroom!",
       ];
       for (let i = 0; i < lines.length; i += 1) {
         ctx.fillText(lines[i], canvas.width / 2, 278 + i * 26);
@@ -1512,10 +1890,12 @@
         drawPixelTennisBall(ctx, bullet.x, bullet.y, 1);
       }
 
+      this.drawParticles();
       drawPixelAussie(ctx, this.player.x, this.player.y, 1.45);
       this.drawHud();
 
       if (this.messageTimer > 0) {
+        const isOuch = this.messageKind === "ouch";
         ctx.save();
         ctx.textAlign = "center";
         pixelRect(ctx, 118, 316, 144, 62, "#020202");
@@ -1524,14 +1904,20 @@
         ctx.strokeRect(120, 318, 140, 58);
         ctx.fillStyle = "#00f060";
         ctx.font = "700 15px ui-monospace, SFMono-Regular, Menlo, monospace";
-        ctx.fillText(`WAVE ${String(this.wave).padStart(2, "0")}`, 190, 342);
-        ctx.fillStyle = "#f0cf3e";
-        ctx.fillText("GET READY!", 190, 364);
+        if (isOuch) {
+          ctx.fillStyle = "#f0cf3e";
+          ctx.font = "700 20px ui-monospace, SFMono-Regular, Menlo, monospace";
+          ctx.fillText("Ouch!", 190, 356);
+        } else {
+          ctx.fillText(`WAVE ${String(this.wave).padStart(2, "0")}`, 190, 342);
+          ctx.fillStyle = "#f0cf3e";
+          ctx.fillText("GET READY!", 190, 364);
+        }
         ctx.restore();
       }
 
       if (this.state === "gameover") {
-        this.drawOverlay("GAME OVER", "TAP TO DEFEND AGAIN");
+        this.drawOverlay("GAME OVER!", "TAP TO DEFEND AGAIN");
       }
       if (this.state === "intro") {
         this.drawIntroOverlay();
@@ -2856,11 +3242,14 @@
 
     drawPieceIcon(type, centerX, centerY, radius) {
       const { ctx } = this;
-      const drawSize = radius * (type === 0 ? 2.58 : 2.78);
+      const drawSize = radius * 2.78;
+      if (type === 0 && drawAtlasSprite(ctx, deweyImages.pieces, deweyPieceSprites[3], centerX, centerY, drawSize, drawSize)) {
+        return;
+      }
       if (type === 2 && drawImageFit(ctx, deweyImages.lighthouseBook, centerX, centerY, drawSize, drawSize)) {
         return;
       }
-      if (type === 3 && drawImageFit(ctx, deweyImages.arizonaBook, centerX, centerY, drawSize, drawSize)) {
+      if (type === 3 && drawImageFit(ctx, deweyImages.arizonaBook, centerX, centerY, radius * 3.08, radius * 3.08)) {
         return;
       }
       if (type === 4 && drawImageFit(ctx, deweyImages.puzzleBook, centerX, centerY, drawSize, drawSize)) {
@@ -3042,7 +3431,6 @@
         earnedStars >= deweyStarThresholds.length
           ? 1
           : clamp((visibleScore - currentThreshold) / bandSize, 0, 1);
-      const remainingToNext = Math.max(0, nextThreshold - visibleScore);
       for (let i = 0; i < 3; i += 1) {
         ctx.fillStyle = i < earnedStars ? "#ffd44d" : "#3d210f";
         ctx.strokeStyle = "#5b2a0e";
@@ -3067,14 +3455,6 @@
         ctx.fillStyle = "#31b7e8";
         ctx.fill();
       }
-      ctx.fillStyle = "#fff3cf";
-      ctx.strokeStyle = "#4f260f";
-      ctx.font = "900 12px Georgia, serif";
-      ctx.lineWidth = 3;
-      const progressText =
-        earnedStars >= deweyStarThresholds.length ? "3 STARS" : `${remainingToNext.toLocaleString("en-US")} TO NEXT`;
-      ctx.strokeText(progressText, scorePanel.x + scorePanel.w / 2, scorePanel.y + 135);
-      ctx.fillText(progressText, scorePanel.x + scorePanel.w / 2, scorePanel.y + 135);
       ctx.restore();
     },
 
@@ -3666,6 +4046,7 @@
 
   function launchGame(game) {
     activeGame = game;
+    setBrowserChrome(game);
     shell.classList.add("is-opening");
     shell.dataset.screen = game;
 
@@ -3677,6 +4058,7 @@
 
   function backToMenu() {
     activeGame = null;
+    setBrowserChrome("menu");
     shell.classList.remove("is-opening");
     shell.dataset.screen = "menu";
   }
@@ -3792,5 +4174,6 @@
   drawBookwormMenuPreview();
   centipede.reset();
   candy.reset({ resetScore: true });
+  setBrowserChrome("menu");
   requestAnimationFrame(tick);
 })();
