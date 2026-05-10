@@ -10,7 +10,7 @@
     { name: "Star Book", color: "#1f69cf", accent: "star" },
     { name: "Cactus Book", color: "#cf4631", accent: "cactus" },
     { name: "Compass Book", color: "#76a820", accent: "compass" },
-    { name: "Diamond Book", color: "#7f43a7", accent: "diamond" },
+    { name: "Arizona Book", color: "#1d4f9a", accent: "arizona" },
     { name: "Locked Book", color: "#8f5427", accent: "lock" },
     { name: "Bible Book", color: "#202020", accent: "cross" },
     { name: "Globe", color: "#2d8ec8", accent: "globe" },
@@ -39,6 +39,7 @@
     pieces: new Image(),
     sign: new Image(),
     lighthouseBook: new Image(),
+    arizonaBook: new Image(),
     puzzleBook: new Image(),
     bibleBook: new Image(),
     forbesMagazine: new Image(),
@@ -52,6 +53,7 @@
   deweyImages.pieces.src = "assets/dewey/pieces-atlas.png";
   deweyImages.sign.src = "assets/dewey/sign-dewey-disorder.png";
   deweyImages.lighthouseBook.src = "assets/dewey/book-lighthouse.png";
+  deweyImages.arizonaBook.src = "assets/dewey/book-arizona.png";
   deweyImages.puzzleBook.src = "assets/dewey/book-puzzle.png";
   deweyImages.bibleBook.src = "assets/dewey/book-bible.png";
   deweyImages.forbesMagazine.src = "assets/dewey/book-forbes-magazine.png";
@@ -2854,8 +2856,11 @@
 
     drawPieceIcon(type, centerX, centerY, radius) {
       const { ctx } = this;
-      const drawSize = radius * (type === 0 ? 2.48 : 2.78);
+      const drawSize = radius * (type === 0 ? 2.58 : 2.78);
       if (type === 2 && drawImageFit(ctx, deweyImages.lighthouseBook, centerX, centerY, drawSize, drawSize)) {
+        return;
+      }
+      if (type === 3 && drawImageFit(ctx, deweyImages.arizonaBook, centerX, centerY, drawSize, drawSize)) {
         return;
       }
       if (type === 4 && drawImageFit(ctx, deweyImages.puzzleBook, centerX, centerY, drawSize, drawSize)) {
