@@ -23,6 +23,9 @@
   ];
 
   const isPowerupType = (type) => candyTypes[type]?.powerup === true;
+  const deweyStarThresholds = [0, 10000, 20000];
+  const magnetType = candyTypes.findIndex((type) => type.accent === "magnet");
+  const tntType = candyTypes.findIndex((type) => type.accent === "tnt");
   const powerupDrawOffsets = {
     magnet: { x: 0.2, y: 0 },
     tnt: { x: 0.18, y: -0.18 },
@@ -39,7 +42,6 @@
     forbesMagazine: new Image(),
     tumbleweed: new Image(),
     wantedPoster: new Image(),
-    cowgirl: new Image(),
   };
 
   deweyImages.background.src = "assets/dewey/background.png";
@@ -52,7 +54,6 @@
   deweyImages.forbesMagazine.src = "assets/dewey/book-forbes-magazine.png";
   deweyImages.tumbleweed.src = "assets/dewey/tumbleweed.png";
   deweyImages.wantedPoster.src = "assets/dewey/wanted-poster.png";
-  deweyImages.cowgirl.src = "cowgirl.gif";
 
   const deweyPieceSprites = [
     { x: 96, y: 53, w: 254, h: 291 },
@@ -83,6 +84,7 @@
   const randInt = (max) => Math.floor(Math.random() * max);
   const cellKey = (col, row) => `${col},${row}`;
   const bookwormHighScoreKey = "bookwormWatchHighScore";
+  const deweyHighScoreKey = "deweyDisorderHighScore";
   const readStoredNumber = (key, fallback = 0) => {
     try {
       if (typeof localStorage === "undefined") return fallback;
@@ -868,7 +870,7 @@
     fireTimer: 0,
     fireCooldown: 0.23,
     maxShots: 3,
-    state: "playing",
+    state: "intro",
     messageTimer: 0,
     obstacles: new Map(),
     segments: [],
@@ -888,13 +890,42 @@
       this.isFiring = false;
       this.spider = null;
       this.spiderTimer = 1.1 + Math.random() * 1.1;
-      this.messageTimer = 1.5;
-      this.state = "playing";
+      this.messageTimer = 0;
+      this.state = "intro";
       this.bullets = [];
       this.player = { x: 190, y: 656, targetX: 190, targetY: 656 };
       this.makeObstacles();
       this.spawnBookworm();
       this.draw();
+    },
+
+    introButton() {
+      return {
+        x: 172,
+        y: 442,
+        w: 136,
+        h: 46,
+      };
+    },
+
+    isIntroButtonEvent(event) {
+      const point = canvasPoint(this.canvas, event);
+      const button = this.introButton();
+      return (
+        point.x >= button.x &&
+        point.x <= button.x + button.w &&
+        point.y >= button.y &&
+        point.y <= button.y + button.h
+      );
+    },
+
+    startFirstWave() {
+      if (this.state !== "intro") return false;
+      this.state = "playing";
+      this.messageTimer = 1.5;
+      this.stepTimer = 0;
+      this.draw();
+      return true;
     },
 
     updateHighScore() {
@@ -1031,6 +1062,9 @@
     },
 
     fire() {
+      if (this.state === "intro") {
+        return;
+      }
       if (this.state !== "playing") {
         this.reset();
         return;
@@ -1061,15 +1095,19 @@
       }
       this.bullets = this.bullets.filter((bullet) => bullet.y > -20);
 
-      this.stepTimer += dt;
-      while (this.stepTimer >= this.stepEvery) {
-        this.stepTimer -= this.stepEvery;
-        this.advanceBookworm();
-      }
+      if (this.messageTimer <= 0) {
+        this.stepTimer += dt;
+        while (this.stepTimer >= this.stepEvery && this.messageTimer <= 0) {
+          this.stepTimer -= this.stepEvery;
+          this.advanceBookworm();
+        }
 
-      this.updateSpider(dt);
-      this.resolveBulletHits();
-      this.resolvePlayerHits();
+        if (this.messageTimer <= 0) {
+          this.updateSpider(dt);
+          this.resolveBulletHits();
+          this.resolvePlayerHits();
+        }
+      }
       this.draw();
     },
 
@@ -1186,8 +1224,16 @@
         return;
       }
 
-      this.segments.unshift({ col: nextCol, row: nextRow, part: this.randomBookwormPart() });
-      this.segments = this.segments.slice(0, this.segmentLimit);
+      const previousPositions = this.segments.map((segment) => ({
+        col: segment.col,
+        row: segment.row,
+      }));
+      this.segments[0].col = nextCol;
+      this.segments[0].row = nextRow;
+      for (let i = 1; i < this.segments.length; i += 1) {
+        this.segments[i].col = previousPositions[i - 1].col;
+        this.segments[i].row = previousPositions[i - 1].row;
+      }
     },
 
     loseLife() {
@@ -1403,6 +1449,45 @@
       ctx.restore();
     },
 
+    drawIntroOverlay() {
+      const { ctx, canvas } = this;
+      const button = this.introButton();
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.82)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      pixelRect(ctx, 46, 196, 388, 326, "#020202");
+      ctx.strokeStyle = "#ff2aa6";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(48, 198, 384, 322);
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#00f060";
+      ctx.font = "700 18px ui-monospace, SFMono-Regular, Menlo, monospace";
+      ctx.fillText("BOOKWORM WATCH", canvas.width / 2, 234);
+      ctx.fillStyle = "#f0cf3e";
+      ctx.font = "700 15px ui-monospace, SFMono-Regular, Menlo, monospace";
+      const lines = [
+        "Oh no! The books have come",
+        "alive while your parents are",
+        "away!! Dutifully prevent them",
+        "from encroaching on the",
+        "bedroom!",
+      ];
+      for (let i = 0; i < lines.length; i += 1) {
+        ctx.fillText(lines[i], canvas.width / 2, 278 + i * 26);
+      }
+
+      pixelRect(ctx, button.x, button.y, button.w, button.h, "#050505");
+      ctx.fillStyle = "#00f060";
+      ctx.fillRect(button.x + 3, button.y + 3, button.w - 6, button.h - 6);
+      ctx.strokeStyle = "#f0cf3e";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(button.x + 3, button.y + 3, button.w - 6, button.h - 6);
+      ctx.fillStyle = "#020202";
+      ctx.font = "700 17px ui-monospace, SFMono-Regular, Menlo, monospace";
+      ctx.fillText("PLAY", button.x + button.w / 2, button.y + 29);
+      ctx.restore();
+    },
+
     draw() {
       const { ctx } = this;
       this.drawBackground();
@@ -1442,6 +1527,9 @@
       if (this.state === "gameover") {
         this.drawOverlay("GAME OVER", "TAP TO DEFEND AGAIN");
       }
+      if (this.state === "intro") {
+        this.drawIntroOverlay();
+      }
     },
   };
 
@@ -1453,6 +1541,7 @@
     board: [],
     goals: [],
     powerupSlots: Array(4).fill(null),
+    selectedPowerupSlot: null,
     selected: null,
     activeMatches: new Set(),
     animations: [],
@@ -1465,17 +1554,27 @@
     status: "playing",
     score: 0,
     displayScore: 0,
+    highScore: readStoredNumber(deweyHighScoreKey, 0),
+    gameOverScore: 0,
+    gameOverHighScore: readStoredNumber(deweyHighScoreKey, 0),
     moves: 28,
     freeSwitches: 3,
     freeSwitchMode: false,
     freeSwitchSelected: null,
+    optionHint: null,
     scoreTween: null,
     sequence: 0,
 
-    reset() {
-      this.score = 0;
-      this.displayScore = 0;
+    reset({ resetScore = true } = {}) {
+      if (resetScore) {
+        this.score = 0;
+      }
+      this.displayScore = this.score;
+      this.highScore = readStoredNumber(deweyHighScoreKey, 0);
+      this.gameOverScore = this.score;
+      this.gameOverHighScore = this.highScore;
       this.powerupSlots = Array(4).fill(null);
+      this.selectedPowerupSlot = null;
       this.selected = null;
       this.freeSwitches = 3;
       this.freeSwitchMode = false;
@@ -1485,6 +1584,7 @@
       this.particles = [];
       this.scorePops = [];
       this.shuffleIntro = null;
+      this.optionHint = null;
       this.hiddenCells = new Set();
       this.scoreTween = null;
       this.sequence += 1;
@@ -1663,9 +1763,18 @@
     freeSwitchButton() {
       return {
         x: 82,
-        y: this.canvas.height - 76,
+        y: this.canvas.height - 88,
         radius: 45,
       };
+    },
+
+    powerupSlotFromEvent(event) {
+      const point = canvasPoint(this.canvas, event);
+      for (let i = 0; i < this.powerupSlots.length; i += 1) {
+        const slot = this.boosterSlotCenter(i);
+        if (Math.hypot(point.x - slot.x, point.y - slot.y) <= 72) return i;
+      }
+      return -1;
     },
 
     isFreeSwitchButtonEvent(event) {
@@ -1679,13 +1788,146 @@
       this.freeSwitchMode = !this.freeSwitchMode;
       this.freeSwitchSelected = null;
       this.selected = null;
+      this.selectedPowerupSlot = null;
       this.pointerDown = null;
       this.draw();
       return true;
     },
 
+    powerupReady(slot) {
+      return Boolean(slot && performance.now() >= slot.availableAt);
+    },
+
+    selectPowerupSlot(index) {
+      if (this.busy || this.status !== "playing") return false;
+      const slot = this.powerupSlots[index];
+      if (!this.powerupReady(slot)) return false;
+      this.selectedPowerupSlot = this.selectedPowerupSlot === index ? null : index;
+      this.selected = null;
+      this.freeSwitchMode = false;
+      this.freeSwitchSelected = null;
+      this.pointerDown = null;
+      this.draw();
+      return true;
+    },
+
+    selectedPowerupType() {
+      if (this.selectedPowerupSlot === null) return null;
+      const slot = this.powerupSlots[this.selectedPowerupSlot];
+      if (!this.powerupReady(slot)) {
+        if (!slot) this.selectedPowerupSlot = null;
+        return null;
+      }
+      return slot.type;
+    },
+
+    consumeSelectedPowerup(expectedType) {
+      if (this.selectedPowerupType() !== expectedType) return false;
+      this.powerupSlots[this.selectedPowerupSlot] = null;
+      this.selectedPowerupSlot = null;
+      this.selected = null;
+      this.freeSwitchSelected = null;
+      this.pointerDown = null;
+      return true;
+    },
+
     firstEmptyPowerupSlot() {
       return this.powerupSlots.findIndex((slot) => !slot);
+    },
+
+    hasInventoryPowerups() {
+      return this.powerupSlots.some(Boolean);
+    },
+
+    hasEscapeTools() {
+      return this.freeSwitches > 0 || this.hasInventoryPowerups();
+    },
+
+    updateHighScore() {
+      if (this.score <= this.highScore) return;
+      this.highScore = this.score;
+      writeStoredNumber(deweyHighScoreKey, this.highScore);
+    },
+
+    endRun(status = "lost") {
+      this.status = status;
+      this.busy = false;
+      this.selected = null;
+      this.freeSwitchMode = false;
+      this.freeSwitchSelected = null;
+      this.selectedPowerupSlot = null;
+      this.pointerDown = null;
+      this.optionHint = null;
+      this.gameOverScore = this.score;
+      this.updateHighScore();
+      this.gameOverHighScore = this.highScore;
+      this.updateHud();
+    },
+
+    triggerOptionHint() {
+      const targets = [];
+      if (this.freeSwitches > 0) targets.push("free");
+      for (let i = 0; i < this.powerupSlots.length; i += 1) {
+        if (this.powerupSlots[i]) targets.push(`slot:${i}`);
+      }
+      if (!targets.length) return false;
+      this.optionHint = {
+        targets,
+        start: performance.now(),
+        duration: 1180,
+      };
+      return true;
+    },
+
+    optionHintTransform(target, now = performance.now()) {
+      const hint = this.optionHint;
+      if (!hint || !hint.targets.includes(target)) return { y: 0, scale: 1 };
+      const t = clamp((now - hint.start) / hint.duration, 0, 1);
+      const wave = Math.sin(t * Math.PI * 4);
+      const envelope = Math.sin(t * Math.PI);
+      return {
+        y: -wave * 18 * envelope,
+        scale: 1 + Math.abs(wave) * 0.16 * envelope,
+      };
+    },
+
+    resolveIdleBoard() {
+      this.busy = false;
+      this.activeMatches = new Set();
+      if (this.goalsComplete()) {
+        this.endRun("won");
+      } else if (this.moves > 0 && this.hasAvailableMove()) {
+        this.status = "playing";
+      } else if (this.hasEscapeTools()) {
+        this.status = "playing";
+        this.selected = null;
+        this.pointerDown = null;
+        this.triggerOptionHint();
+      } else {
+        this.endRun("lost");
+      }
+      this.updateHud();
+      this.draw();
+    },
+
+    playAgainButton() {
+      return {
+        x: this.canvas.width / 2 - 160,
+        y: this.canvas.height / 2 + 220,
+        w: 320,
+        h: 82,
+      };
+    },
+
+    isPlayAgainButtonEvent(event) {
+      const point = canvasPoint(this.canvas, event);
+      const button = this.playAgainButton();
+      return (
+        point.x >= button.x &&
+        point.x <= button.x + button.w &&
+        point.y >= button.y &&
+        point.y <= button.y + button.h
+      );
     },
 
     remainingGoalTypes() {
@@ -1751,8 +1993,146 @@
       this.board[b.row][b.col] = next;
     },
 
+    activateTnt(cell) {
+      if (this.busy || this.status !== "playing" || !this.consumeSelectedPowerup(tntType)) return false;
+      const cells = [];
+      for (let row = cell.row - 1; row <= cell.row + 1; row += 1) {
+        for (let col = cell.col - 1; col <= cell.col + 1; col += 1) {
+          if (col < 0 || col >= this.size || row < 0 || row >= this.size) continue;
+          if (this.board[row][col] < 0) continue;
+          cells.push({ col, row, key: cellKey(col, row), type: this.board[row][col], center: this.cellCenter(col, row) });
+        }
+      }
+      if (!cells.length) return false;
+
+      const token = this.sequence;
+      const now = performance.now();
+      const blastKeys = new Set(cells.map((piece) => piece.key));
+      const blastCenter = this.cellCenter(cell.col, cell.row);
+      this.busy = true;
+      this.activeMatches = blastKeys;
+      this.collectGoals(blastKeys);
+
+      for (let i = 0; i < cells.length; i += 1) {
+        const piece = cells[i];
+        this.hiddenCells.add(piece.key);
+        this.board[piece.row][piece.col] = -1;
+        this.addBurst(piece.type, piece.center.x, piece.center.y, 16);
+        this.animations.push({
+          kind: "explode",
+          layer: "board",
+          type: piece.type,
+          x: piece.center.x,
+          y: piece.center.y,
+          dx: (piece.center.x - blastCenter.x) * 0.34 + (Math.random() - 0.5) * 24,
+          dy: (piece.center.y - blastCenter.y) * 0.34 + (Math.random() - 0.5) * 24,
+          spin: (Math.random() - 0.5) * 1.4,
+          start: now + i * 12,
+          duration: 420,
+        });
+      }
+      this.addBurst(tntType, blastCenter.x, blastCenter.y, 34);
+      this.addScore(cells.length * 110 + 450, blastCenter.x, blastCenter.y);
+      this.updateHud();
+      this.draw();
+
+      window.setTimeout(() => {
+        if (token !== this.sequence) return;
+        for (const key of blastKeys) {
+          this.hiddenCells.delete(key);
+        }
+        this.activeMatches = new Set();
+        this.applyDropAndRefillAnimations(token);
+      }, 520);
+      return true;
+    },
+
+    activateMagnet(a, b) {
+      if (this.selectedPowerupType() !== magnetType) return false;
+      if (this.busy || this.status !== "playing" || !this.isAdjacent(a, b)) return false;
+      const horizontal = a.row === b.row && a.col !== b.col;
+      const vertical = a.col === b.col && a.row !== b.row;
+      if (!horizontal && !vertical) {
+        this.selected = b;
+        this.draw();
+        return false;
+      }
+      if (!this.consumeSelectedPowerup(magnetType)) return false;
+
+      const axis = horizontal ? "row" : "col";
+      const line = horizontal ? a.row : a.col;
+      const direction = horizontal ? (b.col > a.col ? 1 : -1) : b.row > a.row ? 1 : -1;
+      const token = this.sequence;
+      const now = performance.now();
+      const duration = 380;
+      const currentValues = horizontal ? this.board[line].slice() : Array.from({ length: this.size }, (_, row) => this.board[row][line]);
+      const nextValues = Array(this.size).fill(-1);
+      const pieces = [];
+      for (let index = 0; index < this.size; index += 1) {
+        const toIndex = (index + direction + this.size) % this.size;
+        nextValues[toIndex] = currentValues[index];
+        const from = horizontal ? { col: index, row: line } : { col: line, row: index };
+        const to = horizontal ? { col: toIndex, row: line } : { col: line, row: toIndex };
+        pieces.push({
+          type: currentValues[index],
+          from,
+          to,
+        });
+        this.hiddenCells.add(cellKey(from.col, from.row));
+      }
+
+      this.busy = true;
+      this.animations.push({
+        kind: "rowShift",
+        layer: "board",
+        axis,
+        line,
+        direction,
+        pieces,
+        start: now,
+        duration,
+      });
+      for (let i = 0; i < 32; i += 1) {
+        const index = i % this.size;
+        const center = horizontal ? this.cellCenter(index, line) : this.cellCenter(line, index);
+        this.particles.push({
+          x: center.x + (Math.random() - 0.5) * 36,
+          y: center.y + (Math.random() - 0.5) * 32,
+          vx: horizontal ? direction * (120 + Math.random() * 170) : -50 + Math.random() * 100,
+          vy: vertical ? direction * (120 + Math.random() * 170) : -50 + Math.random() * 100,
+          size: 2 + Math.random() * 4,
+          color: i % 2 ? "#7de3ff" : "#ffd44d",
+          start: now + Math.random() * 120,
+          duration: 360 + Math.random() * 180,
+        });
+      }
+      this.draw();
+
+      window.setTimeout(() => {
+        if (token !== this.sequence) return;
+        if (horizontal) {
+          this.board[line] = nextValues;
+        } else {
+          for (let row = 0; row < this.size; row += 1) {
+            this.board[row][line] = nextValues[row];
+          }
+        }
+        for (const piece of pieces) {
+          this.hiddenCells.delete(cellKey(piece.from.col, piece.from.row));
+        }
+        const matches = this.findMatches();
+        if (matches.size) {
+          this.resolveMatches(matches);
+          return;
+        }
+        this.resolveIdleBoard();
+      }, duration + 40);
+      return true;
+    },
+
     trySwap(a, b) {
-      if (this.busy || this.status !== "playing" || this.moves <= 0 || !this.isAdjacent(a, b)) return;
+      if (this.selectedPowerupType() === magnetType) return this.activateMagnet(a, b);
+      if (this.busy || this.status !== "playing" || this.moves <= 0 || !this.isAdjacent(a, b)) return false;
       this.swap(a, b);
       const matches = this.findMatches();
       this.swap(a, b);
@@ -1762,8 +2142,11 @@
         this.animateSwap(a, b, false, () => {
           this.selected = b;
           this.busy = false;
+          if (!this.hasAvailableMove()) {
+            this.resolveIdleBoard();
+          }
         });
-        return;
+        return true;
       }
 
       this.busy = true;
@@ -1775,6 +2158,7 @@
         this.updateHud();
         this.resolveMatches(matches);
       });
+      return true;
     },
 
     tryFreeSwitch(a, b) {
@@ -1823,11 +2207,7 @@
           this.resolveMatches(matches);
           return;
         }
-        this.busy = false;
-        if (this.moves <= 0 && this.freeSwitches <= 0) {
-          this.status = "lost";
-        }
-        this.draw();
+        this.resolveIdleBoard();
       }, duration + 16);
     },
 
@@ -1844,7 +2224,10 @@
     handleTap(cell) {
       if (this.busy) return;
       if (this.status !== "playing") {
-        this.reset();
+        return;
+      }
+      if (this.selectedPowerupType() === tntType) {
+        this.activateTnt(cell);
         return;
       }
       if (this.freeSwitchMode) {
@@ -2182,6 +2565,9 @@
         this.shuffleIntro = null;
         this.busy = false;
       }
+      if (this.optionHint && now >= this.optionHint.start + this.optionHint.duration + 40) {
+        this.optionHint = null;
+      }
       if (this.scoreTween) {
         const t = clamp((now - this.scoreTween.start) / this.scoreTween.duration, 0, 1);
         this.displayScore = this.scoreTween.from + (this.scoreTween.to - this.scoreTween.from) * easeOut(t);
@@ -2196,17 +2582,7 @@
 
     resolveMatches(matches = this.findMatches()) {
       if (!matches.size) {
-        this.busy = false;
-        this.activeMatches = new Set();
-        if (this.goalsComplete()) {
-          this.status = "won";
-        } else if (this.moves <= 0 && this.freeSwitches <= 0) {
-          this.status = "lost";
-        } else {
-          this.ensureSolvableBoard();
-        }
-        this.updateHud();
-        this.draw();
+        this.resolveIdleBoard();
         return;
       }
 
@@ -2537,21 +2913,6 @@
       ctx.restore();
     },
 
-    drawCowgirlSprite() {
-      if (!imageLoaded(deweyImages.cowgirl)) return;
-      const { ctx } = this;
-      const { sign } = this.metrics();
-      const height = 172;
-      const width = height * (deweyImages.cowgirl.naturalWidth / deweyImages.cowgirl.naturalHeight);
-      const x = sign.x - width - 18;
-      const y = sign.y + sign.h - height - 30;
-
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(deweyImages.cowgirl, Math.round(x), Math.round(y), Math.round(width), height);
-      ctx.restore();
-    },
-
     drawPanel() {
       const { ctx } = this;
       const { movesPanel, goalsPanel, scorePanel, sign } = this.metrics();
@@ -2582,8 +2943,6 @@
       ctx.strokeText(this.moves, movesPanel.x + movesPanel.w / 2, movesPanel.y + 114);
       ctx.fillText(this.moves, movesPanel.x + movesPanel.w / 2, movesPanel.y + 114);
       ctx.restore();
-
-      this.drawCowgirlSprite();
 
       if (!drawImageFit(ctx, deweyImages.sign, sign.x + sign.w / 2, sign.y + sign.h / 2, sign.w, sign.h)) {
         drawWesternPanel(ctx, sign.x, sign.y, sign.w, sign.h, 20);
@@ -2617,8 +2976,19 @@
 
       ctx.save();
       ctx.textAlign = "center";
+      const visibleScore = Math.max(0, Math.round(this.displayScore));
+      const earnedStars = deweyStarThresholds.filter((threshold) => visibleScore >= threshold).length;
+      const currentThreshold = deweyStarThresholds[Math.max(0, earnedStars - 1)] ?? 0;
+      const nextThreshold = deweyStarThresholds[earnedStars] ?? deweyStarThresholds[deweyStarThresholds.length - 1];
+      const maxBarWidth = scorePanel.w - 56;
+      const bandSize = Math.max(1, nextThreshold - currentThreshold);
+      const bandProgress =
+        earnedStars >= deweyStarThresholds.length
+          ? 1
+          : clamp((visibleScore - currentThreshold) / bandSize, 0, 1);
+      const remainingToNext = Math.max(0, nextThreshold - visibleScore);
       for (let i = 0; i < 3; i += 1) {
-        ctx.fillStyle = i === 0 || this.score > i * 8000 ? "#ffd44d" : "#3d210f";
+        ctx.fillStyle = i < earnedStars ? "#ffd44d" : "#3d210f";
         ctx.strokeStyle = "#5b2a0e";
         ctx.lineWidth = 4;
         drawStarShape(ctx, scorePanel.x + 44 + i * 42, scorePanel.y + 42, 21, 10);
@@ -2629,50 +2999,79 @@
       ctx.strokeStyle = "#4f260f";
       ctx.lineWidth = 5;
       ctx.font = "900 26px Georgia, serif";
-      const scoreText = Math.round(this.displayScore).toLocaleString("en-US");
+      const scoreText = visibleScore.toLocaleString("en-US");
       ctx.strokeText(scoreText, scorePanel.x + scorePanel.w / 2, scorePanel.y + 92);
       ctx.fillText(scoreText, scorePanel.x + scorePanel.w / 2, scorePanel.y + 92);
       roundedRect(ctx, scorePanel.x + 25, scorePanel.y + 118, scorePanel.w - 50, 22, 9);
       ctx.fillStyle = "#2e170a";
       ctx.fill();
-      roundedRect(ctx, scorePanel.x + 28, scorePanel.y + 121, Math.min(scorePanel.w - 56, 20 + this.displayScore / 80), 16, 7);
-      ctx.fillStyle = "#31b7e8";
-      ctx.fill();
+      const barFillWidth = maxBarWidth * bandProgress;
+      if (barFillWidth > 0) {
+        roundedRect(ctx, scorePanel.x + 28, scorePanel.y + 121, Math.max(10, barFillWidth), 16, 7);
+        ctx.fillStyle = "#31b7e8";
+        ctx.fill();
+      }
+      ctx.fillStyle = "#fff3cf";
+      ctx.strokeStyle = "#4f260f";
+      ctx.font = "900 12px Georgia, serif";
+      ctx.lineWidth = 3;
+      const progressText =
+        earnedStars >= deweyStarThresholds.length ? "3 STARS" : `${remainingToNext.toLocaleString("en-US")} TO NEXT`;
+      ctx.strokeText(progressText, scorePanel.x + scorePanel.w / 2, scorePanel.y + 135);
+      ctx.fillText(progressText, scorePanel.x + scorePanel.w / 2, scorePanel.y + 135);
       ctx.restore();
     },
 
     drawBoosters() {
-      const { ctx, canvas } = this;
+      const { ctx } = this;
       const y = this.metrics().boosterY;
       const now = performance.now();
       for (let i = 0; i < 4; i += 1) {
         const { x } = this.boosterSlotCenter(i);
+        const isSelected = this.selectedPowerupSlot === i && this.powerupReady(this.powerupSlots[i]);
+        const hint = this.optionHintTransform(`slot:${i}`, now);
         ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.35)";
-        ctx.shadowBlur = 12;
-        drawWesternPanel(ctx, x - 62, y - 62, 124, 124, 62);
-        ctx.restore();
-
+        ctx.translate(x, y + hint.y);
+        ctx.scale(hint.scale, hint.scale);
+        ctx.shadowColor = isSelected ? "rgba(49, 183, 232, 0.8)" : "rgba(0,0,0,0.35)";
+        ctx.shadowBlur = isSelected || hint.scale > 1 ? 24 : 12;
+        drawWesternPanel(ctx, -62, -62, 124, 124, 62);
+        if (isSelected) {
+          ctx.strokeStyle = "#ffd44d";
+          ctx.lineWidth = 7;
+          ctx.beginPath();
+          ctx.arc(0, 0, 69 + Math.sin(now / 130) * 3, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.strokeStyle = "rgba(49, 183, 232, 0.92)";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(0, 0, 58, 0, Math.PI * 2);
+          ctx.stroke();
+        }
         const slot = this.powerupSlots[i];
         if (slot && now >= slot.availableAt) {
-          this.drawPieceIcon(slot.type, x, y, 31);
+          this.drawPieceIcon(slot.type, 0, 0, 31);
         }
+        ctx.restore();
       }
 
       const button = this.freeSwitchButton();
+      const hint = this.optionHintTransform("free", now);
       ctx.save();
+      ctx.translate(button.x, button.y + hint.y);
+      ctx.scale(hint.scale, hint.scale);
       ctx.fillStyle = this.freeSwitches > 0 ? "#2f78a6" : "#5b4630";
       ctx.strokeStyle = this.freeSwitchMode ? "#ffd44d" : "#fff3cf";
       ctx.lineWidth = this.freeSwitchMode ? 8 : 5;
       ctx.beginPath();
-      ctx.arc(button.x, button.y, button.radius, 0, Math.PI * 2);
+      ctx.arc(0, 0, button.radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       if (this.freeSwitchMode) {
         ctx.strokeStyle = "rgba(49, 183, 232, 0.78)";
         ctx.lineWidth = 5;
         ctx.beginPath();
-        ctx.arc(button.x, button.y, button.radius + 11, 0, Math.PI * 2);
+        ctx.arc(0, 0, button.radius + 11, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.fillStyle = this.freeSwitches > 0 ? "#fff3cf" : "rgba(255, 243, 207, 0.55)";
@@ -2681,8 +3080,15 @@
       ctx.font = "900 46px Georgia, serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.strokeText(this.freeSwitches, button.x, button.y + 2);
-      ctx.fillText(this.freeSwitches, button.x, button.y + 2);
+      ctx.strokeText(this.freeSwitches, 0, -4);
+      ctx.fillText(this.freeSwitches, 0, -4);
+      ctx.font = "900 15px Georgia, serif";
+      ctx.lineWidth = 4;
+      ctx.fillStyle = "#fff3cf";
+      ctx.strokeStyle = "#4f260f";
+      ctx.textBaseline = "alphabetic";
+      ctx.strokeText("Free Swap", 0, button.radius + 24);
+      ctx.fillText("Free Swap", 0, button.radius + 24);
       ctx.restore();
     },
 
@@ -2690,11 +3096,13 @@
       const { ctx } = this;
       const radius = this.metrics().tile * 0.265;
       for (const animation of this.animations) {
-        const movesPowerup = Boolean(
-          animation.kind === "collectPowerup" ||
-            isPowerupType(animation.type) ||
-            animation.pieces?.some((piece) => isPowerupType(piece.type)),
-        );
+        const movesPowerup = animation.layer
+          ? animation.layer === "powerup"
+          : Boolean(
+              animation.kind === "collectPowerup" ||
+                isPowerupType(animation.type) ||
+                animation.pieces?.some((piece) => isPowerupType(piece.type)),
+            );
         if (movesPowerup !== powerupLayer) continue;
 
         const rawT = (now - animation.start) / animation.duration;
@@ -2727,6 +3135,36 @@
           const y = from.y + (to.y - from.y) * p;
           const scale = 0.84 + Math.min(1, t * 2) * 0.16;
           this.drawPieceIcon(animation.type, x, y, radius * scale);
+        }
+
+        if (animation.kind === "rowShift") {
+          const { x, y, tile, boardSize } = this.metrics();
+          const p = easeInOut(t);
+          const axis = animation.axis ?? "row";
+          ctx.save();
+          roundedRect(ctx, x - 8, y - 8, boardSize + 16, boardSize + 16, 10);
+          ctx.clip();
+          for (const piece of animation.pieces) {
+            const from = this.cellCenter(piece.from.col, piece.from.row);
+            const shiftX = axis === "row" ? animation.direction * tile * p : 0;
+            const shiftY = axis === "col" ? animation.direction * tile * p : 0;
+            const drawX = from.x + shiftX;
+            const drawY = from.y + shiftY - Math.sin(p * Math.PI) * (axis === "row" ? 5 : 0);
+            const scale = 1 + Math.sin(p * Math.PI) * 0.05;
+            this.drawPieceIcon(piece.type, drawX, drawY, radius * scale);
+            const needsWrap =
+              axis === "row"
+                ? (animation.direction > 0 && drawX > x + boardSize - tile / 2) ||
+                  (animation.direction < 0 && drawX < x + tile / 2)
+                : (animation.direction > 0 && drawY > y + boardSize - tile / 2) ||
+                  (animation.direction < 0 && drawY < y + tile / 2);
+            if (needsWrap) {
+              const wrapX = axis === "row" ? drawX - animation.direction * boardSize : drawX;
+              const wrapY = axis === "col" ? drawY - animation.direction * boardSize : drawY;
+              this.drawPieceIcon(piece.type, wrapX, wrapY, radius * scale);
+            }
+          }
+          ctx.restore();
         }
 
         if (animation.kind === "organize") {
@@ -2771,6 +3209,16 @@
           ctx.save();
           ctx.globalAlpha = 1 - p;
           this.drawPieceIcon(animation.type, animation.x, animation.y - p * 16, radius * (1 + p * 0.34));
+          ctx.restore();
+        }
+
+        if (animation.kind === "explode") {
+          const p = easeOut(t);
+          ctx.save();
+          ctx.translate(animation.x + animation.dx * p, animation.y + animation.dy * p);
+          ctx.rotate(animation.spin * p);
+          ctx.globalAlpha = 1 - p;
+          this.drawPieceIcon(animation.type, 0, 0, radius * (1 + p * 0.44));
           ctx.restore();
         }
       }
@@ -2955,6 +3403,98 @@
       }
     },
 
+    drawEndOverlay(now) {
+      const { ctx, canvas } = this;
+      const button = this.playAgainButton();
+      const panel = {
+        x: canvas.width / 2 - 280,
+        y: canvas.height / 2 - 270,
+        w: 560,
+        h: 610,
+      };
+      const scoreText = Math.round(this.gameOverScore).toLocaleString("en-US");
+      const highScoreText = Math.round(this.gameOverHighScore).toLocaleString("en-US");
+      const title = this.status === "won" ? "LIST COMPLETE" : "GAME OVER";
+
+      ctx.save();
+      ctx.fillStyle = "rgba(33, 21, 13, 0.78)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      drawWesternPanel(ctx, panel.x, panel.y, panel.w, panel.h, 28);
+
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#ffd44d";
+      ctx.strokeStyle = "#4f260f";
+      ctx.lineWidth = 8;
+      ctx.font = "900 62px Georgia, serif";
+      ctx.strokeText(title, canvas.width / 2, panel.y + 104);
+      ctx.fillText(title, canvas.width / 2, panel.y + 104);
+
+      for (let i = 0; i < 3; i += 1) {
+        const starX = canvas.width / 2 - 92 + i * 92;
+        ctx.fillStyle = i === 1 ? "#fff0b8" : "#d79a38";
+        ctx.strokeStyle = "#5b2a0e";
+        ctx.lineWidth = 5;
+        drawStarShape(ctx, starX, panel.y + 165, 28 + Math.sin(now / 260 + i) * 2, 13);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "rgba(46, 23, 10, 0.72)";
+      roundedRect(ctx, panel.x + 82, panel.y + 215, panel.w - 164, 82, 18);
+      ctx.fill();
+      roundedRect(ctx, panel.x + 82, panel.y + 325, panel.w - 164, 82, 18);
+      ctx.fill();
+
+      ctx.fillStyle = "#fff3cf";
+      ctx.strokeStyle = "#4f260f";
+      ctx.lineWidth = 5;
+      ctx.font = "900 28px Georgia, serif";
+      ctx.strokeText("SCORE", canvas.width / 2, panel.y + 250);
+      ctx.fillText("SCORE", canvas.width / 2, panel.y + 250);
+      ctx.font = "900 42px Georgia, serif";
+      ctx.strokeText(scoreText, canvas.width / 2, panel.y + 292);
+      ctx.fillText(scoreText, canvas.width / 2, panel.y + 292);
+
+      ctx.font = "900 28px Georgia, serif";
+      ctx.strokeText("HIGH SCORE", canvas.width / 2, panel.y + 360);
+      ctx.fillText("HIGH SCORE", canvas.width / 2, panel.y + 360);
+      ctx.font = "900 42px Georgia, serif";
+      ctx.strokeText(highScoreText, canvas.width / 2, panel.y + 402);
+      ctx.fillText(highScoreText, canvas.width / 2, panel.y + 402);
+
+      ctx.save();
+      ctx.translate(button.x + button.w / 2, button.y + button.h / 2);
+      const pulse = 1 + Math.sin(now / 220) * 0.018;
+      ctx.scale(pulse, pulse);
+      drawWesternPanel(ctx, -button.w / 2, -button.h / 2, button.w, button.h, 24);
+      ctx.fillStyle = "#31b7e8";
+      roundedRect(ctx, -button.w / 2 + 12, -button.h / 2 + 12, button.w - 24, button.h - 24, 18);
+      ctx.fill();
+      ctx.strokeStyle = "#fff3cf";
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.fillStyle = "#fff3cf";
+      ctx.beginPath();
+      ctx.moveTo(-88, -15);
+      ctx.lineTo(-88, 15);
+      ctx.lineTo(-58, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#17394d";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.fillStyle = "#fff3cf";
+      ctx.strokeStyle = "#17394d";
+      ctx.lineWidth = 5;
+      ctx.font = "900 30px Georgia, serif";
+      ctx.textBaseline = "middle";
+      ctx.strokeText("PLAY AGAIN", 34, 1);
+      ctx.fillText("PLAY AGAIN", 34, 1);
+      ctx.restore();
+
+      ctx.restore();
+    },
+
     draw(activeMatches = this.activeMatches) {
       const { ctx, canvas } = this;
       const now = performance.now();
@@ -3057,17 +3597,7 @@
       this.drawScorePops(now);
 
       if (this.status === "won" || this.status === "lost") {
-        ctx.save();
-        ctx.fillStyle = "rgba(24, 31, 46, 0.72)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.textAlign = "center";
-        ctx.fillStyle = "#fff7c5";
-        ctx.font = "800 36px Inter, system-ui, sans-serif";
-        ctx.fillText(this.status === "won" ? "List complete" : "Out of moves", canvas.width / 2, canvas.height / 2 - 12);
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "700 17px Inter, system-ui, sans-serif";
-        ctx.fillText("Tap the board or press restart", canvas.width / 2, canvas.height / 2 + 25);
-        ctx.restore();
+        this.drawEndOverlay(now);
       }
     },
   };
@@ -3102,6 +3632,12 @@
 
   centipede.canvas.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    if (centipede.state === "intro") {
+      if (centipede.isIntroButtonEvent(event)) {
+        centipede.startFirstWave();
+      }
+      return;
+    }
     centipede.canvas.setPointerCapture(event.pointerId);
     centipede.updatePointer(event);
     centipede.isFiring = true;
@@ -3110,6 +3646,7 @@
 
   centipede.canvas.addEventListener("pointermove", (event) => {
     event.preventDefault();
+    if (centipede.state === "intro") return;
     centipede.updatePointer(event);
   });
 
@@ -3125,15 +3662,26 @@
   candy.canvas.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     if (candy.status !== "playing") {
-      candy.reset();
+      if (candy.isPlayAgainButtonEvent(event)) {
+        candy.reset({ resetScore: true });
+      }
       return;
     }
     if (candy.isFreeSwitchButtonEvent(event)) {
       candy.toggleFreeSwitchMode();
       return;
     }
+    const powerupSlot = candy.powerupSlotFromEvent(event);
+    if (powerupSlot >= 0) {
+      candy.selectPowerupSlot(powerupSlot);
+      return;
+    }
     const cell = candy.cellFromEvent(event);
     if (!cell || candy.busy) return;
+    if (candy.selectedPowerupType() === tntType) {
+      candy.handleTap(cell);
+      return;
+    }
     if (candy.freeSwitchMode) {
       candy.handleFreeSwitchCell(cell);
       return;
@@ -3147,8 +3695,9 @@
     event.preventDefault();
     const cell = candy.cellFromEvent(event);
     if (cell && candy.isAdjacent(candy.pointerDown, cell)) {
-      candy.trySwap(candy.pointerDown, cell);
-      candy.pointerDown = null;
+      if (candy.trySwap(candy.pointerDown, cell) !== false) {
+        candy.pointerDown = null;
+      }
     }
   });
 
@@ -3180,6 +3729,6 @@
 
   drawBookwormMenuPreview();
   centipede.reset();
-  candy.reset();
+  candy.reset({ resetScore: true });
   requestAnimationFrame(tick);
 })();

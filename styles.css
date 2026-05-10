@@ -188,6 +188,23 @@ canvas {
   user-select: none;
 }
 
+.cowgirl-sprite {
+  position: absolute;
+  left: 7.9%;
+  top: 19.85%;
+  z-index: 2;
+  width: 14.8%;
+  height: auto;
+  pointer-events: none;
+  image-rendering: auto;
+  transform: translateZ(0);
+}
+
+.board-frame > canvas {
+  position: relative;
+  z-index: 1;
+}
+
 .candy-hud div {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
