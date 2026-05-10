@@ -18,12 +18,14 @@
     { name: "Forbes Magazine", color: "#111111", accent: "magazine" },
     { name: "Tumbleweed", color: "#d99a3a", accent: "tumbleweed" },
     { name: "Wanted Poster", color: "#c58b45", accent: "poster" },
+    { name: "Unearthed Box", color: "#8d4b2e", accent: "unearthedBox" },
     { name: "Magnet", color: "#c94b35", accent: "magnet", powerup: true, boosterSprite: 3 },
     { name: "TNT", color: "#df3428", accent: "tnt", powerup: true, boosterSprite: 5 },
   ];
 
   const isPowerupType = (type) => candyTypes[type]?.powerup === true;
   const deweyStarThresholds = [0, 10000, 20000];
+  const unearthedBoxType = candyTypes.findIndex((type) => type.accent === "unearthedBox");
   const magnetType = candyTypes.findIndex((type) => type.accent === "magnet");
   const tntType = candyTypes.findIndex((type) => type.accent === "tnt");
   const powerupDrawOffsets = {
@@ -42,6 +44,7 @@
     forbesMagazine: new Image(),
     tumbleweed: new Image(),
     wantedPoster: new Image(),
+    unearthedBox: new Image(),
   };
 
   deweyImages.background.src = "assets/dewey/background.png";
@@ -54,6 +57,7 @@
   deweyImages.forbesMagazine.src = "assets/dewey/book-forbes-magazine.png";
   deweyImages.tumbleweed.src = "assets/dewey/tumbleweed.png";
   deweyImages.wantedPoster.src = "assets/dewey/wanted-poster.png";
+  deweyImages.unearthedBox.src = "assets/dewey/unearthed-box.png";
 
   const deweyPieceSprites = [
     { x: 96, y: 53, w: 254, h: 291 },
@@ -2867,6 +2871,9 @@
         return;
       }
       if (type === 10 && drawImageFit(ctx, deweyImages.wantedPoster, centerX, centerY, radius * 3.55, radius * 3.55)) {
+        return;
+      }
+      if (type === unearthedBoxType && drawImageFit(ctx, deweyImages.unearthedBox, centerX, centerY, radius * 3.72, radius * 3.72)) {
         return;
       }
       if (isPowerupType(type)) {
