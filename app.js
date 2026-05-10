@@ -1879,7 +1879,6 @@
       this.scoreTween = null;
       this.displayScore = this.score;
       this.powerupSlots = Array(4).fill(null);
-      this.freeSwitches = 3;
       this.sequence += 1;
       this.busy = false;
       this.status = "playing";
