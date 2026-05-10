@@ -1864,6 +1864,33 @@
       this.updateHud();
     },
 
+    startNextList() {
+      this.selected = null;
+      this.freeSwitchMode = false;
+      this.freeSwitchSelected = null;
+      this.selectedPowerupSlot = null;
+      this.pointerDown = null;
+      this.optionHint = null;
+      this.activeMatches = new Set();
+      this.animations = [];
+      this.particles = [];
+      this.scorePops = [];
+      this.hiddenCells = new Set();
+      this.scoreTween = null;
+      this.displayScore = this.score;
+      this.powerupSlots = Array(4).fill(null);
+      this.freeSwitches = 3;
+      this.sequence += 1;
+      this.busy = false;
+      this.status = "playing";
+      this.goals = this.makeGoals();
+      this.moves = this.calculateMoveBudget();
+      this.createBoard();
+      this.startShuffleIntro();
+      this.updateHud();
+      this.draw();
+    },
+
     triggerOptionHint() {
       const targets = [];
       if (this.freeSwitches > 0) targets.push("free");
@@ -1895,7 +1922,8 @@
       this.busy = false;
       this.activeMatches = new Set();
       if (this.goalsComplete()) {
-        this.endRun("won");
+        this.startNextList();
+        return;
       } else if (this.moves > 0 && this.hasAvailableMove()) {
         this.status = "playing";
       } else if (this.hasEscapeTools()) {
@@ -1927,10 +1955,10 @@
 
     playAgainButton() {
       return {
-        x: this.canvas.width / 2 - 160,
-        y: this.canvas.height / 2 + 220,
-        w: 320,
-        h: 82,
+        x: this.canvas.width / 2 - 170,
+        y: this.canvas.height / 2 + 224,
+        w: 340,
+        h: 78,
       };
     },
 
@@ -3432,6 +3460,29 @@
       const scoreText = Math.round(this.gameOverScore).toLocaleString("en-US");
       const highScoreText = Math.round(this.gameOverHighScore).toLocaleString("en-US");
       const title = this.status === "won" ? "LIST COMPLETE" : "GAME OVER";
+      const setFittedFont = (text, maxSize, minSize, maxWidth) => {
+        let size = maxSize;
+        do {
+          ctx.font = `900 ${size}px Georgia, serif`;
+          if (ctx.measureText(text).width <= maxWidth || size <= minSize) return;
+          size -= 2;
+        } while (size >= minSize);
+      };
+      const drawScoreRow = (label, value, rowY) => {
+        roundedRect(ctx, panel.x + 82, rowY, panel.w - 164, 88, 18);
+        ctx.fillStyle = "rgba(46, 23, 10, 0.72)";
+        ctx.fill();
+        ctx.fillStyle = "#fff3cf";
+        ctx.strokeStyle = "#4f260f";
+        ctx.lineWidth = 5;
+        ctx.textBaseline = "middle";
+        ctx.font = "900 23px Georgia, serif";
+        ctx.strokeText(label, canvas.width / 2, rowY + 27);
+        ctx.fillText(label, canvas.width / 2, rowY + 27);
+        setFittedFont(value, 36, 26, panel.w - 210);
+        ctx.strokeText(value, canvas.width / 2, rowY + 61);
+        ctx.fillText(value, canvas.width / 2, rowY + 61);
+      };
 
       ctx.save();
       ctx.fillStyle = "rgba(33, 21, 13, 0.78)";
@@ -3442,42 +3493,23 @@
       ctx.fillStyle = "#ffd44d";
       ctx.strokeStyle = "#4f260f";
       ctx.lineWidth = 8;
-      ctx.font = "900 62px Georgia, serif";
-      ctx.strokeText(title, canvas.width / 2, panel.y + 104);
-      ctx.fillText(title, canvas.width / 2, panel.y + 104);
+      ctx.textBaseline = "alphabetic";
+      setFittedFont(title, 58, 42, panel.w - 86);
+      ctx.strokeText(title, canvas.width / 2, panel.y + 98);
+      ctx.fillText(title, canvas.width / 2, panel.y + 98);
 
       for (let i = 0; i < 3; i += 1) {
         const starX = canvas.width / 2 - 92 + i * 92;
         ctx.fillStyle = i === 1 ? "#fff0b8" : "#d79a38";
         ctx.strokeStyle = "#5b2a0e";
         ctx.lineWidth = 5;
-        drawStarShape(ctx, starX, panel.y + 165, 28 + Math.sin(now / 260 + i) * 2, 13);
+        drawStarShape(ctx, starX, panel.y + 154, 27 + Math.sin(now / 260 + i) * 2, 13);
         ctx.fill();
         ctx.stroke();
       }
 
-      ctx.fillStyle = "rgba(46, 23, 10, 0.72)";
-      roundedRect(ctx, panel.x + 82, panel.y + 215, panel.w - 164, 82, 18);
-      ctx.fill();
-      roundedRect(ctx, panel.x + 82, panel.y + 325, panel.w - 164, 82, 18);
-      ctx.fill();
-
-      ctx.fillStyle = "#fff3cf";
-      ctx.strokeStyle = "#4f260f";
-      ctx.lineWidth = 5;
-      ctx.font = "900 28px Georgia, serif";
-      ctx.strokeText("SCORE", canvas.width / 2, panel.y + 250);
-      ctx.fillText("SCORE", canvas.width / 2, panel.y + 250);
-      ctx.font = "900 42px Georgia, serif";
-      ctx.strokeText(scoreText, canvas.width / 2, panel.y + 292);
-      ctx.fillText(scoreText, canvas.width / 2, panel.y + 292);
-
-      ctx.font = "900 28px Georgia, serif";
-      ctx.strokeText("HIGH SCORE", canvas.width / 2, panel.y + 360);
-      ctx.fillText("HIGH SCORE", canvas.width / 2, panel.y + 360);
-      ctx.font = "900 42px Georgia, serif";
-      ctx.strokeText(highScoreText, canvas.width / 2, panel.y + 402);
-      ctx.fillText(highScoreText, canvas.width / 2, panel.y + 402);
+      drawScoreRow("SCORE", scoreText, panel.y + 206);
+      drawScoreRow("HIGH SCORE", highScoreText, panel.y + 322);
 
       ctx.save();
       ctx.translate(button.x + button.w / 2, button.y + button.h / 2);
@@ -3492,9 +3524,9 @@
       ctx.stroke();
       ctx.fillStyle = "#fff3cf";
       ctx.beginPath();
-      ctx.moveTo(-88, -15);
-      ctx.lineTo(-88, 15);
-      ctx.lineTo(-58, 0);
+      ctx.moveTo(-122, -15);
+      ctx.lineTo(-122, 15);
+      ctx.lineTo(-94, 0);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = "#17394d";
@@ -3503,8 +3535,9 @@
       ctx.fillStyle = "#fff3cf";
       ctx.strokeStyle = "#17394d";
       ctx.lineWidth = 5;
-      ctx.font = "900 30px Georgia, serif";
+      ctx.textAlign = "center";
       ctx.textBaseline = "middle";
+      setFittedFont("PLAY AGAIN", 29, 23, button.w - 142);
       ctx.strokeText("PLAY AGAIN", 34, 1);
       ctx.fillText("PLAY AGAIN", 34, 1);
       ctx.restore();
