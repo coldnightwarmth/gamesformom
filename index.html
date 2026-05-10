@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bookworm Watch & Dewey Disorder</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell" data-screen="menu">
+      <section class="game-layer" aria-live="polite">
+        <div class="topbar">
+          <button class="icon-button" id="backButton" type="button" aria-label="Back to game select">
+            <span aria-hidden="true">&lsaquo;</span>
+          </button>
+          <button class="icon-button" id="restartButton" type="button" aria-label="Restart current game">
+            <span aria-hidden="true">&#8635;</span>
+          </button>
+        </div>
+
+        <div class="stage-wrap centipede-stage" id="centipedeStage">
+          <div class="cabinet-frame">
+            <canvas id="centipedeCanvas" width="480" height="720" aria-label="Centipede arcade game"></canvas>
+          </div>
+        </div>
+
+        <div class="stage-wrap candy-stage" id="candyStage">
+          <div class="candy-hud">
+            <div>
+              <span>Score</span>
+              <strong id="candyScore">0</strong>
+            </div>
+            <div>
+              <span>Moves</span>
+              <strong id="candyMoves">30</strong>
+            </div>
+          </div>
+          <div class="board-frame">
+            <canvas id="candyCanvas" width="1024" height="1536" aria-label="Dewey Disorder match game"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="selector-layer" id="selectorLayer" aria-label="Game selection">
+        <article class="choice-panel choice-centipede">
+          <div class="choice-content">
+            <h2>Bookworm Watch</h2>
+            <button class="choice-button" type="button" data-game="centipede">
+              <span class="play-icon" aria-hidden="true"></span>
+              <span>Play</span>
+            </button>
+          </div>
+          <div class="pixel-field" aria-hidden="true">
+            <canvas id="bookwormMenuCanvas" width="480" height="720"></canvas>
+          </div>
+        </article>
+
+        <article class="choice-panel choice-candy">
+          <div class="choice-content">
+            <h2>Dewey Disorder</h2>
+            <button class="choice-button" type="button" data-game="candy">
+              <span class="play-icon" aria-hidden="true"></span>
+              <span>Play</span>
+            </button>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
