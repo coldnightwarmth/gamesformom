@@ -3498,9 +3498,10 @@
       ctx.strokeText(title, canvas.width / 2, panel.y + 98);
       ctx.fillText(title, canvas.width / 2, panel.y + 98);
 
+      const finalStars = deweyStarThresholds.filter((threshold) => Math.round(this.gameOverScore) >= threshold).length;
       for (let i = 0; i < 3; i += 1) {
         const starX = canvas.width / 2 - 92 + i * 92;
-        ctx.fillStyle = i === 1 ? "#fff0b8" : "#d79a38";
+        ctx.fillStyle = i < finalStars ? "#ffd44d" : "#3d210f";
         ctx.strokeStyle = "#5b2a0e";
         ctx.lineWidth = 5;
         drawStarShape(ctx, starX, panel.y + 154, 27 + Math.sin(now / 260 + i) * 2, 13);
